@@ -22,6 +22,8 @@
   header h1{font-size:20px;margin:0;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap}
   .levels{display:flex;gap:6px;flex-wrap:wrap}
   .lv{width:34px;height:34px;border-radius:50%;border:2px solid #93c5fd;background:transparent;color:#fff;font:inherit;font-size:14px;cursor:pointer;position:relative}
+  .lv.hard{border-color:#f87171}
+  .lv.hard::after{content:'🔥';position:absolute;top:-8px;right:-6px;font-size:11px}
   .lv.done{background:#22c55e;border-color:#22c55e}
   .lv.cur{background:#fff;color:var(--header);border-color:#fff;font-weight:600}
   .lv.done.cur{box-shadow:0 0 0 3px #22c55e}
@@ -138,8 +140,16 @@ const LEVELS = [
     text:'ด่านสุดท้าย! ถ้ามีทางข้างหน้า → เดิน ไม่อย่างนั้น → ถ้ามีทางซ้ายให้เลี้ยวซ้าย ไม่อย่างนั้นเลี้ยวขวา (ซ้อน "ถ้า" ไว้ใน "ถ้า")',
     tools:['fwd','left','right','until','if','ifelse'],
     map:["########","#S..####","###.####","###...##","#####.##","#G....##","########","########"]},
+  { title:'ล่าเพชร 💎', dir:1, best:6, max:6, hard:true,
+    text:'ธงถูกล็อก 🔒 ต้องเก็บเพชร 💎 ให้ครบทุกเม็ดก่อน! ใช้ "ถ้ามีเพชรตรงนี้ → เก็บเพชร" และ "ถ้ามีทางซ้าย → เลี้ยวซ้าย" ระวัง: ก้าวแรกจะเดินผ่านธงตอนเพชรยังไม่ครบ ต้องวนให้รอบ (ใช้ได้ 6 บล็อก)',
+    tools:['fwd','left','right','until','if','collect','ifgem'],
+    map:["########","#*...*##","#.###.##","#*###*##","#.###.##","#.SG..##","########","########"]},
+  { title:'ด่านบอส: กุญแจ ประตู วาร์ป', dir:1, best:8, max:9, hard:true,
+    text:'ด่านบอส! ประตู 🚪 ล็อกอยู่ ต้องไปเอากุญแจ 🔑 ก่อน, วาร์ป 🌀 จะพาไปอีกที่, แล้วยังมีหินขวางอีก! เขียนโปรแกรมเดียวให้ผ่านทั้งหมด: ถ้ามีหิน→กระโดด ไม่อย่างนั้น (ถ้ามีทาง→เดิน ไม่อย่างนั้น (ถ้ามีทางซ้าย→เลี้ยวซ้าย ไม่อย่างนั้น→เลี้ยวขวา)) (ใช้ได้ 9 บล็อก)',
+    tools:['fwd','left','right','jump','until','if','ifelse'],
+    map:["##########","##K#######","##.#######","##.#######","#S.D..A###","##########","##########","#B.X..X.G#","##########","##########"]},
 ];
-LEVELS.forEach(L=>{ L.map.forEach((row,y)=>{ const x=row.indexOf('S'); if(x>=0){L.sx=x;L.sy=y;} const g=row.indexOf('G'); if(g>=0){L.gx=g;L.gy=y;} }); L.w=L.map[0].length; L.h=L.map.length; });
+LEVELS.forEach(L=>{ L.gems=L.map.join('').split('*').length-1; L.map.forEach((row,y)=>{ const x=row.indexOf('S'); if(x>=0){L.sx=x;L.sy=y;} const g=row.indexOf('G'); if(g>=0){L.gx=g;L.gy=y;} }); L.w=L.map[0].length; L.h=L.map.length; });
 
 const DX=[0,1,0,-1], DY=[-1,0,1,0];
 
@@ -159,13 +169,14 @@ Blockly.common.defineBlocksWithJsonArray([
   {type:'stk_turn', message0:'เลี้ยว %1', args0:[{type:'field_dropdown',name:'DIR',options:[['ซ้าย ↺','LEFT'],['ขวา ↻','RIGHT']]}],
     previousStatement:null, nextStatement:null, colour:C_MOVE, tooltip:'หันซ้ายหรือขวา 90 องศา'},
   {type:'stk_jump', message0:'🤸 กระโดดข้าม', previousStatement:null, nextStatement:null, colour:'#0fbd8c', tooltip:'กระโดดไปข้างหน้า 2 ช่อง ข้ามก้อนหิน'},
+  {type:'stk_collect', message0:'💎 เก็บเพชร', previousStatement:null, nextStatement:null, colour:'#0ea5e9', tooltip:'เก็บเพชรในช่องที่ยืนอยู่'},
   {type:'stk_repeat', message0:'🔁 ทำซ้ำ %1 ครั้ง', args0:[{type:'field_number',name:'N',value:3,min:1,max:20,precision:1}],
     message1:'%1', args1:[{type:'input_statement',name:'DO'}], previousStatement:null, nextStatement:null, colour:C_LOOP},
   {type:'stk_until', message0:'🔁 ทำซ้ำจนกว่าจะถึง 🚩', message1:'%1', args1:[{type:'input_statement',name:'DO'}],
     previousStatement:null, nextStatement:null, colour:C_LOOP},
-  {type:'stk_if', message0:'ถ้ามี %1', args0:[{type:'field_dropdown',name:'COND',options:[['ทางข้างหน้า','AHEAD'],['ทางซ้าย','LEFT'],['ทางขวา','RIGHT'],['หินข้างหน้า','ROCK']]}],
+  {type:'stk_if', message0:'ถ้ามี %1', args0:[{type:'field_dropdown',name:'COND',options:[['ทางข้างหน้า','AHEAD'],['ทางซ้าย','LEFT'],['ทางขวา','RIGHT'],['หินข้างหน้า','ROCK'],['เพชรตรงนี้','GEM']]}],
     message1:'ให้ทำ %1', args1:[{type:'input_statement',name:'DO'}], previousStatement:null, nextStatement:null, colour:C_LOGIC},
-  {type:'stk_ifelse', message0:'ถ้ามี %1', args0:[{type:'field_dropdown',name:'COND',options:[['ทางข้างหน้า','AHEAD'],['ทางซ้าย','LEFT'],['ทางขวา','RIGHT'],['หินข้างหน้า','ROCK']]}],
+  {type:'stk_ifelse', message0:'ถ้ามี %1', args0:[{type:'field_dropdown',name:'COND',options:[['ทางข้างหน้า','AHEAD'],['ทางซ้าย','LEFT'],['ทางขวา','RIGHT'],['หินข้างหน้า','ROCK'],['เพชรตรงนี้','GEM']]}],
     message1:'ให้ทำ %1', args1:[{type:'input_statement',name:'DO'}],
     message2:'ไม่อย่างนั้น %1', args2:[{type:'input_statement',name:'ELSE'}], previousStatement:null, nextStatement:null, colour:C_LOGIC},
 ]);
@@ -179,6 +190,8 @@ const TOOL_DEF = {
   until:{kind:'block',type:'stk_until'},
   if:{kind:'block',type:'stk_if',fields:{COND:'LEFT'}},
   ifelse:{kind:'block',type:'stk_ifelse',fields:{COND:'AHEAD'}},
+  collect:{kind:'block',type:'stk_collect'},
+  ifgem:{kind:'block',type:'stk_if',fields:{COND:'GEM'}},
 };
 
 let ws = null;
@@ -212,35 +225,59 @@ function updateCount(){
 
 // ---------------- Simulation ----------------
 function tileAt(L,x,y){ if(x<0||y<0||x>=L.w||y>=L.h) return '#'; return L.map[y][x]; }
-const walk = t => t==='.'||t==='S'||t==='G';
+const WALK_TILES='.SGK*AB';
 
 function simulate(L){
-  const st={x:L.sx,y:L.sy,dir:L.dir,done:false,result:null};
-  const acts=[]; const LIMIT=500;
+  const st={x:L.sx,y:L.sy,dir:L.dir,done:false,result:null,key:false,gems:new Set()};
+  const acts=[]; const LIMIT=600;
   const push=a=>{ acts.push(a); if(acts.length>LIMIT && !st.done){ st.done=true; st.result='limit'; } };
+  const passable=(x,y)=>{ const t=tileAt(L,x,y); return t==='D' ? st.key : WALK_TILES.includes(t); };
+  const gemHere=()=>tileAt(L,st.x,st.y)==='*' && !st.gems.has(st.x+','+st.y);
   const cond=(c)=>{
+    if(c==='GEM') return gemHere();
     const d = c==='LEFT'?(st.dir+3)%4 : c==='RIGHT'?(st.dir+1)%4 : st.dir;
-    const t = tileAt(L, st.x+DX[d], st.y+DY[d]);
-    return c==='ROCK' ? t==='X' : walk(t);
+    const nx=st.x+DX[d], ny=st.y+DY[d];
+    return c==='ROCK' ? tileAt(L,nx,ny)==='X' : passable(nx,ny);
   };
-  const atGoal=()=>st.x===L.gx&&st.y===L.gy;
+  const allGems=()=>st.gems.size===L.gems;
+  const atGoal=()=>st.x===L.gx&&st.y===L.gy&&allGems();
+  const fail=(b,why)=>{ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why}); st.done=true; st.result=why; };
+  // after landing on a tile: key pickup, portal, goal
+  function arrive(b,a){
+    const t=tileAt(L,st.x,st.y);
+    if(t==='K' && !st.key){ st.key=true; a.pickKey=true; }
+    if(t==='G' && !allGems()) a.note='ยังเก็บเพชรไม่ครบ!';
+    if(t==='D') a.note='ประตูเปิดแล้ว!';
+    if(t==='A'||t==='B'){
+      const other = t==='A'?'B':'A';
+      let tx,ty; L.map.forEach((row,y)=>{ const x=row.indexOf(other); if(x>=0){tx=x;ty=y;} });
+      push({type:'teleport',id:b.id,fx:st.x,fy:st.y,x:tx,y:ty,dir:st.dir}); st.x=tx; st.y=ty;
+    }
+    if(atGoal()){ st.done=true; st.result='win'; }
+  }
   function runChain(b){ while(b && !st.done){ if(b.isEnabled()) exec(b); b=b.getNextBlock(); } }
   function exec(b){
     switch(b.type){
       case 'stk_forward': {
         const nx=st.x+DX[st.dir], ny=st.y+DY[st.dir], t=tileAt(L,nx,ny);
-        if(t==='X'){ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why:'rock'}); st.done=true; st.result='rock'; return; }
-        if(!walk(t)){ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why:'wall'}); st.done=true; st.result='wall'; return; }
-        push({type:'move',id:b.id,fx:st.x,fy:st.y,x:nx,y:ny,dir:st.dir}); st.x=nx; st.y=ny;
-        if(atGoal()){ st.done=true; st.result='win'; }
-        return;
+        if(t==='X') return fail(b,'rock');
+        if(t==='D' && !st.key) return fail(b,'door');
+        if(!passable(nx,ny)) return fail(b,'wall');
+        const a={type:'move',id:b.id,fx:st.x,fy:st.y,x:nx,y:ny,dir:st.dir}; push(a); st.x=nx; st.y=ny;
+        arrive(b,a); return;
       }
       case 'stk_jump': {
         const mx=st.x+DX[st.dir], my=st.y+DY[st.dir], lx=st.x+2*DX[st.dir], ly=st.y+2*DY[st.dir];
-        const mt=tileAt(L,mx,my), lt=tileAt(L,lx,ly);
-        if(mt==='#'){ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why:'wall'}); st.done=true; st.result='wall'; return; }
-        if(!walk(lt)){ push({type:'jumpfail',id:b.id,fx:st.x,fy:st.y,dir:st.dir}); st.done=true; st.result='badjump'; return; }
-        push({type:'jump',id:b.id,fx:st.x,fy:st.y,x:lx,y:ly,dir:st.dir}); st.x=lx; st.y=ly;
+        const mt=tileAt(L,mx,my);
+        if(mt==='#') return fail(b,'wall');
+        if(mt==='D' && !st.key) return fail(b,'door');
+        if(!passable(lx,ly)){ push({type:'jumpfail',id:b.id,fx:st.x,fy:st.y,dir:st.dir}); st.done=true; st.result='badjump'; return; }
+        const a={type:'jump',id:b.id,fx:st.x,fy:st.y,x:lx,y:ly,dir:st.dir}; push(a); st.x=lx; st.y=ly;
+        arrive(b,a); return;
+      }
+      case 'stk_collect': {
+        if(!gemHere()){ push({type:'oops',id:b.id,text:'ไม่มีเพชร!'}); st.done=true; st.result='nogem'; return; }
+        st.gems.add(st.x+','+st.y); push({type:'collect',id:b.id,x:st.x,y:st.y});
         if(atGoal()){ st.done=true; st.result='win'; }
         return;
       }
@@ -269,7 +306,7 @@ function simulate(L){
   const first = start && start.getNextBlock();
   if(!first) return {acts:[], result:'empty'};
   runChain(first);
-  if(!st.result) st.result='notgoal';
+  if(!st.result) st.result = (L.gems && !allGems()) ? 'gems' : 'notgoal';
   return {acts, result:st.result};
 }
 
@@ -280,6 +317,9 @@ const FAIL_MSG = {
   notgoal:['ยังไม่ถึงธง 🚩','โปรแกรมจบแล้วแต่สติกแมนยังไปไม่ถึง ลองเพิ่มบล็อกอีก'],
   limit:['วนไม่รู้จบ! 🌀','โปรแกรมทำงานนานเกินไป ลองตรวจดูเงื่อนไขในบล็อกทำซ้ำ'],
   loop:['วนไม่รู้จบ! 🌀','ในบล็อกทำซ้ำไม่มีคำสั่งไหนทำงานเลย สติกแมนเลยยืนเฉยๆ'],
+  door:['ประตูล็อกอยู่! 🚪','ต้องไปเอากุญแจ 🔑 ก่อน ประตูถึงจะเปิด'],
+  nogem:['ไม่มีเพชรตรงนี้! 💎','ใช้ "เก็บเพชร" เฉพาะตอนยืนอยู่บนเพชรเท่านั้น ลองใช้ "ถ้ามีเพชรตรงนี้" ช่วย'],
+  gems:['ยังเก็บเพชรไม่ครบ! 💎','ธงจะปลดล็อกเมื่อเก็บเพชรครบทุกเม็ด'],
   empty:['ยังไม่มีโปรแกรม','ลากบล็อกมาต่อใต้ "เมื่อเริ่มทำงาน" ก่อนนะ'],
 };
 
@@ -292,8 +332,11 @@ function sizeCanvas(){
 }
 sizeCanvas();
 
-let actor = {x:0,y:0,dir:1,ang:90,z:0,phase:0,walking:false,pose:'idle',bx:0,by:0,rot:0};
-let queue=[], cur=null, curT=0, running=false, finalResult=null, confetti=[], bubble=null;
+let actor = {x:0,y:0,dir:1,ang:90,z:0,phase:0,walking:false,pose:'idle',bx:0,by:0,rot:0,scale:1};
+let queue=[], cur=null, curT=0, running=false, finalResult=null, confetti=[], bubble=null, bubbleTimer=0, sparks=[];
+let rw = {key:false, gems:new Set()}; // world state shown on screen
+function sparkle(x,y,c){ for(let i=0;i<18;i++){ const a=Math.random()*7, v=0.02+Math.random()*0.04; sparks.push({x:x+0.5,y:y+0.5,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1,c}); } }
+function say(text,ms){ bubble=text; bubbleTimer=ms||0; }
 
 function hash(x,y){ let h=x*374761393+y*668265263; h=(h^(h>>13))*1274126177; return ((h^(h>>16))>>>0)/4294967295; }
 
@@ -328,7 +371,20 @@ function draw(t){
   for(let y=0;y<L.h;y++) for(let x=0;x<L.w;x++){
     const tile=L.map[y][x], px=ox+x*ts, py=oy+y*ts;
     if(tile==='X') drawRock(px+ts/2, py+ts*0.6, ts);
-    if(tile==='G') drawFlag(px+ts/2, py+ts*0.82, ts, t);
+    if(tile==='G') drawFlag(px+ts/2, py+ts*0.82, ts, t, rw.gems.size<L.gems);
+    if(tile==='*' && !rw.gems.has(x+','+y)) drawGem(px+ts/2, py+ts/2, ts, t, x+y);
+    if(tile==='K' && !rw.key) drawKey(px+ts/2, py+ts/2, ts, t);
+    if(tile==='D') drawDoor(px, py, ts, rw.key);
+    if(tile==='A'||tile==='B') drawPortal(px+ts/2, py+ts/2, ts, t, tile==='A'?'#a855f7':'#06b6d4');
+  }
+  // sparkles
+  sparks.forEach(p=>{ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(ox+p.x*ts,oy+p.y*ts,3,0,7); ctx.fill(); });
+  ctx.globalAlpha=1;
+  if(L.gems || L.map.join('').includes('K')){
+    let hud=''; if(L.gems) hud+=`💎 ${rw.gems.size}/${L.gems}   `; if(L.map.join('').includes('K')) hud+= rw.key?'🔑 มีกุญแจ':'🔑 ยังไม่มีกุญแจ';
+    ctx.font='600 15px Mitr, sans-serif'; const w=ctx.measureText(hud).width+20;
+    ctx.fillStyle='rgba(15,23,42,.75)'; roundRect(8,8,w,28,14); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(hud,18,23);
   }
   // arrow + actor
   const ax=ox+(actor.x+0.5)*ts+actor.bx*ts, ay=oy+(actor.y+0.5)*ts+actor.by*ts;
@@ -337,7 +393,11 @@ function draw(t){
   ctx.restore();
   // shadow
   ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(ax, ay+ts*0.3, ts*0.2*(1-actor.z*0.4), ts*0.07, 0,0,Math.PI*2); ctx.fill();
-  drawStickman(ax, ay+ts*0.3 - actor.z*ts*0.7, ts*0.82, actor, t);
+  if(actor.scale>0.02){
+    ctx.save(); const fy=ay+ts*0.3; ctx.translate(ax,fy); ctx.scale(actor.scale,actor.scale); ctx.translate(-ax,-fy);
+    drawStickman(ax, fy - actor.z*ts*0.7, ts*0.82, actor, t);
+    ctx.restore();
+  }
   if(bubble){ drawBubble(ax, ay - ts*0.55 - actor.z*ts*0.7, bubble, ts); }
   // confetti
   confetti.forEach(p=>{ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=p.c; ctx.fillRect(-4,-2,8,4); ctx.restore(); });
@@ -357,10 +417,50 @@ function drawRock(x,y,s){
   ctx.fillStyle='#8a8f98'; ctx.beginPath(); ctx.moveTo(x-s*0.3,y+s*0.12); ctx.lineTo(x-s*0.24,y-s*0.1); ctx.lineTo(x-s*0.05,y-s*0.24); ctx.lineTo(x+s*0.2,y-s*0.16); ctx.lineTo(x+s*0.3,y+s*0.12); ctx.closePath(); ctx.fill();
   ctx.fillStyle='#b4b9c2'; ctx.beginPath(); ctx.moveTo(x-s*0.2,y-s*0.08); ctx.lineTo(x-s*0.05,y-s*0.2); ctx.lineTo(x+s*0.06,y-s*0.06); ctx.closePath(); ctx.fill();
 }
-function drawFlag(x,y,s,t){
+function drawGem(x,y,s,t,k){
+  const b=Math.sin(t/300+k)*s*0.04; y+=b;
+  ctx.fillStyle='rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x,y+s*0.25-b,s*0.14,s*0.04,0,0,7); ctx.fill();
+  ctx.fillStyle='#38bdf8'; ctx.beginPath(); ctx.moveTo(x,y-s*0.2); ctx.lineTo(x+s*0.16,y-s*0.05); ctx.lineTo(x,y+s*0.2); ctx.lineTo(x-s*0.16,y-s*0.05); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#bae6fd'; ctx.beginPath(); ctx.moveTo(x,y-s*0.2); ctx.lineTo(x+s*0.16,y-s*0.05); ctx.lineTo(x,y-s*0.02); ctx.lineTo(x-s*0.16,y-s*0.05); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#0369a1'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x,y-s*0.2); ctx.lineTo(x+s*0.16,y-s*0.05); ctx.lineTo(x,y+s*0.2); ctx.lineTo(x-s*0.16,y-s*0.05); ctx.closePath(); ctx.stroke();
+  if(Math.sin(t/180+k*3)>0.85){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x+s*0.06,y-s*0.1,s*0.03,0,7); ctx.fill(); }
+}
+function drawKey(x,y,s,t){
+  ctx.save(); ctx.translate(x,y+Math.sin(t/300)*s*0.04); ctx.rotate(-0.6);
+  ctx.strokeStyle='#a16207'; ctx.fillStyle='#facc15'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(-s*0.12,0,s*0.1,0,7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#f3dcab'; ctx.beginPath(); ctx.arc(-s*0.12,0,s*0.04,0,7); ctx.fill();
+  ctx.fillStyle='#facc15'; ctx.fillRect(-s*0.03,-s*0.03,s*0.24,s*0.06); ctx.strokeRect(-s*0.03,-s*0.03,s*0.24,s*0.06);
+  ctx.fillRect(s*0.12,s*0.02,s*0.05,s*0.08); ctx.fillRect(s*0.04,s*0.02,s*0.04,s*0.06);
+  ctx.restore();
+}
+function drawDoor(px,py,s,open){
+  const m=s*0.12;
+  ctx.fillStyle='#78350f'; ctx.fillRect(px+m*0.6,py+m*0.4,s-m*1.2,s-m*0.8);
+  if(open){
+    ctx.fillStyle='#f3dcab'; ctx.fillRect(px+m*1.2,py+m,s-m*2.4,s-m*1.6);
+    ctx.fillStyle='#b45309'; ctx.beginPath(); ctx.moveTo(px+m*1.2,py+m); ctx.lineTo(px+s*0.38,py+m*1.6); ctx.lineTo(px+s*0.38,py+s-m*1.2); ctx.lineTo(px+m*1.2,py+s-m*0.6); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillStyle='#b45309'; ctx.fillRect(px+m*1.2,py+m,s-m*2.4,s-m*1.6);
+    ctx.strokeStyle='#78350f'; ctx.lineWidth=2; for(let i=1;i<3;i++){ ctx.beginPath(); ctx.moveTo(px+m*1.2+(s-m*2.4)*i/3,py+m); ctx.lineTo(px+m*1.2+(s-m*2.4)*i/3,py+s-m*0.6); ctx.stroke(); }
+    const lx=px+s/2, ly=py+s*0.55;
+    ctx.fillStyle='#facc15'; roundRect(lx-s*0.1,ly-s*0.04,s*0.2,s*0.16,3); ctx.fill();
+    ctx.strokeStyle='#facc15'; ctx.lineWidth=s*0.04; ctx.beginPath(); ctx.arc(lx,ly-s*0.04,s*0.06,Math.PI,0); ctx.stroke();
+    ctx.fillStyle='#78350f'; ctx.beginPath(); ctx.arc(lx,ly+s*0.04,s*0.025,0,7); ctx.fill();
+  }
+}
+function drawPortal(x,y,s,t,c){
+  for(let i=3;i>=0;i--){
+    ctx.strokeStyle=c; ctx.globalAlpha=0.35+i*0.15; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(x,y,s*(0.12+i*0.07),s*(0.07+i*0.04),0, t/300+i, t/300+i+Math.PI*1.4); ctx.stroke();
+  }
+  ctx.globalAlpha=1; ctx.fillStyle=c; ctx.beginPath(); ctx.ellipse(x,y,s*0.08,s*0.05,0,0,7); ctx.fill();
+}
+function drawFlag(x,y,s,t,locked){
   ctx.strokeStyle='#5b3a1a'; ctx.lineWidth=s*0.05; ctx.beginPath(); ctx.moveTo(x-s*0.15,y); ctx.lineTo(x-s*0.15,y-s*0.7); ctx.stroke();
-  const w=Math.sin(t/220)*s*0.04;
-  ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(x-s*0.13,y-s*0.7); ctx.quadraticCurveTo(x+s*0.05,y-s*0.66+w,x+s*0.25,y-s*0.6); ctx.quadraticCurveTo(x+s*0.05,y-s*0.5-w,x-s*0.13,y-s*0.44); ctx.closePath(); ctx.fill();
+  const w=locked?0:Math.sin(t/220)*s*0.04;
+  if(locked){ ctx.font=`${s*0.28}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🔒',x+s*0.18,y-s*0.2); }
+  ctx.fillStyle=locked?'#9ca3af':'#ef4444'; ctx.beginPath(); ctx.moveTo(x-s*0.13,y-s*0.7); ctx.quadraticCurveTo(x+s*0.05,y-s*0.66+w,x+s*0.25,y-s*0.6); ctx.quadraticCurveTo(x+s*0.05,y-s*0.5-w,x-s*0.13,y-s*0.44); ctx.closePath(); ctx.fill();
   ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.arc(x-s*0.15,y-s*0.72,s*0.04,0,7); ctx.fill();
 }
 function drawBubble(x,y,text,s){
@@ -427,12 +527,12 @@ function drawStickman(x,y,s,a,t){
 
 // ---------------- Animation ----------------
 function speedMul(){ return [0,0.45,0.7,1,1.6,2.6][+document.getElementById('speed').value]; }
-function durOf(a){ const b=420/speedMul(); return {move:b, jump:b*1.4, turn:b*0.55, bump:b*1.1, jumpfail:b*1.4}[a.type]||b; }
+function durOf(a){ const b=420/speedMul(); return {move:b, jump:b*1.4, turn:b*0.55, bump:b*1.1, jumpfail:b*1.4, collect:b*0.8, teleport:b*1.6, oops:b}[a.type]||b; }
 
 function resetActor(){
   const L=LEVELS[levelIdx];
-  actor={x:L.sx,y:L.sy,dir:L.dir,ang:L.dir*90,z:0,phase:0,walking:false,pose:'idle',bx:0,by:0,rot:0};
-  queue=[]; cur=null; bubble=null; confetti=[];
+  actor={x:L.sx,y:L.sy,dir:L.dir,ang:L.dir*90,z:0,phase:0,walking:false,pose:'idle',bx:0,by:0,rot:0,scale:1};
+  queue=[]; cur=null; bubble=null; bubbleTimer=0; confetti=[]; sparks=[]; rw={key:false,gems:new Set()};
   if(ws) ws.highlightBlock(null);
 }
 function applyAct(a,p){
@@ -443,14 +543,25 @@ function applyAct(a,p){
     case 'turn': { const delta = a.left?-90:90; actor.ang=a.from*90+delta*e; actor.dir = p<0.5?a.from:a.dir; actor.walking=false; break; }
     case 'bump': { const k = p<0.4 ? p/0.4 : Math.max(0,1-(p-0.4)/0.3); actor.bx=DX[a.dir]*0.32*k; actor.by=DY[a.dir]*0.32*k; actor.walking=p<0.4; actor.phase=p*12;
       if(p>0.4){ actor.pose='fail'; actor.rot=Math.min(1,(p-0.4)/0.4)*(a.dir===3?-1:1)*0.35; } break; }
+    case 'collect': actor.z=Math.sin(p*Math.PI)*0.25; actor.pose='jump'; break;
+    case 'oops': actor.pose='fail'; actor.rot=Math.sin(p*Math.PI*4)*0.15; break;
+    case 'teleport': {
+      if(p<0.5){ actor.scale=1-p*2; actor.rot=p*12; }
+      else { actor.x=a.x; actor.y=a.y; actor.scale=(p-0.5)*2; actor.rot=(1-p)*12; }
+      break; }
     case 'jumpfail': actor.bx=DX[a.dir]*1.2*e; actor.by=DY[a.dir]*1.2*e; actor.z=Math.sin(Math.min(p,0.8)/0.8*Math.PI)*0.9; actor.pose=p>0.8?'fail':'jump'; break;
   }
 }
 function endAct(a){
   actor.walking=false; actor.z=0; actor.phase=0;
-  if(a.type==='move'||a.type==='jump'){ actor.x=a.x; actor.y=a.y; actor.pose='idle'; }
+  if(a.type==='move'||a.type==='jump'){ actor.x=a.x; actor.y=a.y; actor.pose='idle';
+    if(a.pickKey){ rw.key=true; sparkle(a.x,a.y,'#facc15'); say('ได้กุญแจ! 🔑',1200); }
+    else if(a.note){ say(a.note,1100); } }
+  if(a.type==='collect'){ rw.gems.add(a.x+','+a.y); sparkle(a.x,a.y,'#38bdf8'); actor.pose='idle'; say('💎 '+rw.gems.size+'/'+LEVELS[levelIdx].gems,700); }
+  if(a.type==='teleport'){ actor.x=a.x; actor.y=a.y; actor.scale=1; actor.rot=0; sparkle(a.x,a.y,'#a855f7'); say('วาร์ป!',800); }
+  if(a.type==='oops'){ actor.rot=0; say(a.text); }
   if(a.type==='turn'){ actor.ang=a.dir*90; actor.dir=a.dir; }
-  if(a.type==='bump'||a.type==='jumpfail'){ actor.pose='fail'; bubble = a.why==='rock'?'โอ๊ย!':'อุ๊ย!'; }
+  if(a.type==='bump'||a.type==='jumpfail'){ actor.pose='fail'; say(a.why==='rock'?'โอ๊ย!':a.why==='door'?'ล็อกอยู่!':'อุ๊ย!'); }
 }
 
 let last=performance.now();
@@ -466,6 +577,9 @@ function frame(t){
   }
   confetti.forEach(c=>{ c.x+=c.vx*dt/16; c.y+=c.vy*dt/16; c.vy+=0.12*dt/16; c.r+=c.vr; });
   confetti = confetti.filter(c=>c.y<CW+20);
+  sparks.forEach(p=>{ p.x+=p.vx*dt/16; p.y+=p.vy*dt/16; p.life-=dt/700; });
+  sparks = sparks.filter(p=>p.life>0);
+  if(bubbleTimer>0){ bubbleTimer-=dt; if(bubbleTimer<=0){ bubbleTimer=0; bubble=null; } }
   draw(t);
   requestAnimationFrame(frame);
 }
@@ -489,8 +603,8 @@ function finishRun(){
   running=false; ws.highlightBlock(null);
   const r=finalResult;
   setTimeout(()=>{
-    if(r==='win'){ actor.pose='win'; bubble='เย้!'; burst(); setTimeout(showWin,900); }
-    else { if(r==='notgoal'||r==='loop'||r==='limit'){ bubble='หืม?'; } setTimeout(()=>showFail(FAIL_MSG[r]), 600); }
+    if(r==='win'){ actor.pose='win'; say('เย้!'); burst(); setTimeout(showWin,900); }
+    else { if(r==='notgoal'||r==='loop'||r==='limit'||r==='gems'){ say('หืม?'); } setTimeout(()=>showFail(FAIL_MSG[r]), 600); }
   }, 120);
 }
 function burst(){ const cols=['#ef4444','#f59e0b','#22c55e','#3b82f6','#a855f7','#ec4899']; for(let i=0;i<120;i++) confetti.push({x:CW/2,y:CW/3,vx:(Math.random()-0.5)*12,vy:-Math.random()*9-2,r:Math.random()*6,vr:(Math.random()-0.5)*0.3,c:cols[i%cols.length]}); }
@@ -521,7 +635,7 @@ function showWin(){
 function escapeHtml(s){ return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 function genCode(){
-  const C={AHEAD:'isPathAhead()',LEFT:'isPathLeft()',RIGHT:'isPathRight()',ROCK:'isRockAhead()'};
+  const C={AHEAD:'isPathAhead()',LEFT:'isPathLeft()',RIGHT:'isPathRight()',ROCK:'isRockAhead()',GEM:'isGemHere()'};
   let out='';
   const chain=(b,ind)=>{ while(b){ one(b,ind); b=b.getNextBlock(); } };
   const one=(b,ind)=>{
@@ -529,6 +643,7 @@ function genCode(){
     switch(b.type){
       case 'stk_forward': out+=p+'moveForward();\n'; break;
       case 'stk_jump': out+=p+'jump();\n'; break;
+      case 'stk_collect': out+=p+'collectGem();\n'; break;
       case 'stk_turn': out+=p+(b.getFieldValue('DIR')==='LEFT'?'turnLeft();':'turnRight();')+'\n'; break;
       case 'stk_repeat': out+=p+`for (let i = 0; i < ${b.getFieldValue('N')}; i++) {\n`; chain(b.getInputTargetBlock('DO'),ind+1); out+=p+'}\n'; break;
       case 'stk_until': out+=p+'while (notAtFlag()) {\n'; chain(b.getInputTargetBlock('DO'),ind+1); out+=p+'}\n'; break;
@@ -554,8 +669,8 @@ function renderLevels(){
   const el=document.getElementById('levels'); el.innerHTML='';
   LEVELS.forEach((L,i)=>{
     const b=document.createElement('button');
-    b.className='lv'+(progress[i]?' done':'')+(i===levelIdx?' cur':'');
-    b.title=`ด่าน ${i+1}: ${L.title}`;
+    b.className='lv'+(L.hard?' hard':'')+(progress[i]?' done':'')+(i===levelIdx?' cur':'');
+    b.title=`ด่าน ${i+1}: ${L.title}${L.hard?' (ยาก)':''}`;
     b.innerHTML = (i+1) + (progress[i]?`<span class="st">${'★'.repeat(progress[i])}</span>`:'');
     b.onclick=()=>loadLevel(i);
     el.appendChild(b);
