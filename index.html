@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stick Man Code Quest</title>
+<meta name="description" content="เกมฝึกเขียนโปรแกรมแบบลากบล็อก พาสติกแมนเดินผ่านด่านไปถึงธง">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/blockly@10.4.3/blockly.min.js"></script>
+<script src="https://unpkg.com/blockly@10.4.3/msg/th.js"></script>
+<style>
+  :root{
+    --bg:#eef4ff; --panel:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --accent:#f97316; --accent-d:#ea580c; --ok:#16a34a; --line:#dbe3f0;
+    --header:#1e3a8a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:'Mitr',system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column}
+  header{background:var(--header);color:#fff;display:flex;align-items:center;gap:16px;padding:8px 16px;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .levels{display:flex;gap:6px;flex-wrap:wrap}
+  .lv{width:34px;height:34px;border-radius:50%;border:2px solid #93c5fd;background:transparent;color:#fff;font:inherit;font-size:14px;cursor:pointer;position:relative}
+  .lv.done{background:#22c55e;border-color:#22c55e}
+  .lv.cur{background:#fff;color:var(--header);border-color:#fff;font-weight:600}
+  .lv.done.cur{box-shadow:0 0 0 3px #22c55e}
+  .lv .st{position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:-1px;color:#fde047;white-space:nowrap}
+  main{flex:1;display:flex;gap:12px;padding:12px;min-height:0}
+  .left{width:min(500px,42vw);display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+  .stage{background:var(--panel);border-radius:14px;padding:10px;box-shadow:0 2px 8px #0001}
+  canvas{width:100%;aspect-ratio:1/1;display:block;border-radius:10px;background:#7cc36b}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button.big{font:inherit;font-size:18px;border:0;border-radius:12px;padding:10px 22px;cursor:pointer;color:#fff;background:var(--accent);box-shadow:0 4px 0 var(--accent-d);transition:transform .05s}
+  button.big:active{transform:translateY(3px);box-shadow:0 1px 0 var(--accent-d)}
+  button.big.reset{background:#3b82f6;box-shadow:0 4px 0 #1d4ed8}
+  button.ghost{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;color:var(--ink)}
+  .speed{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);margin-left:auto}
+  .instr{background:#fff7ed;border:2px solid #fed7aa;border-radius:14px;padding:10px 14px;display:flex;gap:10px;align-items:flex-start}
+  .instr .who{font-size:30px;line-height:1}
+  .instr h2{margin:0 0 2px;font-size:16px;color:var(--accent-d)}
+  .instr p{margin:0;font-size:15px;line-height:1.5}
+  .right{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--panel);border-radius:14px;box-shadow:0 2px 8px #0001;overflow:hidden}
+  .wsbar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:14px;color:var(--muted);gap:8px;flex-wrap:wrap}
+  .wsbar b{color:var(--ink)}
+  .wsbar .over{color:#dc2626}
+  #blockly{flex:1;min-height:360px;position:relative}
+  .modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+  .modal.show{display:flex}
+  .card{background:#fff;border-radius:18px;padding:22px;max-width:460px;width:100%;text-align:center;box-shadow:0 10px 40px #0004;animation:pop .25s ease-out}
+  @keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+  .card h3{margin:0 0 6px;font-size:24px}
+  .card .stars{font-size:40px;letter-spacing:4px;margin:4px 0}
+  .card p{margin:6px 0 14px;color:var(--muted);line-height:1.5}
+  .card .btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  pre.code{text-align:left;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;font-size:13px;max-height:260px;overflow:auto;margin:0 0 14px}
+  @media (max-width:820px){
+    main{flex-direction:column;overflow:auto}
+    .left{width:100%}
+    .stage{max-width:480px;margin:0 auto;width:100%}
+    #blockly{min-height:440px}
+    .right{flex:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧍 Stick Man Code Quest</h1>
+  <div class="levels" id="levels"></div>
+</header>
+<main>
+  <section class="left">
+    <div class="instr">
+      <div class="who">🧍</div>
+      <div><h2 id="ltitle">ด่าน 1</h2><p id="ltext"></p></div>
+    </div>
+    <div class="stage"><canvas id="cv" width="480" height="480"></canvas></div>
+    <div class="controls">
+      <button class="big" id="runBtn">▶ เริ่มทำงาน</button>
+      <button class="ghost" id="codeBtn">{ } ดูโค้ด</button>
+      <label class="speed">🐢 <input type="range" id="speed" min="1" max="5" value="3"> 🐇</label>
+    </div>
+  </section>
+  <section class="right">
+    <div class="wsbar">
+      <span>ลากบล็อกจากด้านซ้ายมาต่อใต้ <b>เมื่อเริ่มทำงาน</b></span>
+      <span id="count"></span>
+      <button class="ghost" id="clearBtn">🗑 เริ่มใหม่</button>
+    </div>
+    <div id="blockly"></div>
+  </section>
+</main>
+
+<div class="modal" id="modal"><div class="card" id="card"></div></div>
+
+<script>
+// ---------------- Levels ----------------
+// # = ต้นไม้/หญ้า (เดินไม่ได้)  . = ทางเดิน  X = ก้อนหิน (ต้องกระโดด)  S = จุดเริ่ม  G = ธง
+// dir: 0=เหนือ 1=ตะวันออก 2=ใต้ 3=ตะวันตก
+const LEVELS = [
+  { title:'ก้าวแรก', dir:1, best:3,
+    text:'ช่วยพาสติกแมนเดินไปถึงธง 🚩 ใช้บล็อก "เดินไปข้างหน้า" ต่อกันหลายๆ อัน',
+    tools:['fwd'],
+    map:["########","########","########","##S..G##","########","########","########","########"]},
+  { title:'เลี้ยวได้ด้วย', dir:1, best:5,
+    text:'ทางเลี้ยวแล้ว! ใช้บล็อก "เลี้ยวซ้าย" หรือ "เลี้ยวขวา" เพื่อหันตัว (ดูลูกศรใต้เท้าว่าหันไปทางไหน)',
+    tools:['fwd','left','right'],
+    map:["########","########","####G###","####.###","##S..###","########","########","########"]},
+  { title:'ทางคดเคี้ยว', dir:2, best:12,
+    text:'ทางคดไปมา ค่อยๆ คิดทีละก้าว เดิน → เลี้ยว → เดิน',
+    tools:['fwd','left','right'],
+    map:["########","#S######","#.######","#...####","###.####","###...G#","########","########"]},
+  { title:'ก้อนหินขวางทาง', dir:1, best:4,
+    text:'มีก้อนหินขวาง! ถ้าเดินชนจะสะดุดล้ม ใช้บล็อก "กระโดดข้าม" เพื่อข้ามไป 2 ช่อง',
+    tools:['fwd','left','right','jump'],
+    map:["########","########","########","#S.X..G#","########","########","########","########"]},
+  { title:'ทำซ้ำ', dir:1, best:2, max:2,
+    text:'ทางยาวมาก! แต่ใช้บล็อกได้แค่ 2 อัน ลองใช้ "ทำซ้ำ ... ครั้ง" แล้วใส่ "เดินไปข้างหน้า" ไว้ข้างใน',
+    tools:['fwd','left','right','repeat'],
+    map:["########","########","########","S......G","########","########","########","########"]},
+  { title:'ขั้นบันได', dir:1, best:5, max:5,
+    text:'ขึ้นบันไดไปหาธง! สังเกตว่าท่าเดินซ้ำกัน ใส่ชุดคำสั่งที่ซ้ำไว้ใน "ทำซ้ำ" (ใช้ได้ 5 บล็อก)',
+    tools:['fwd','left','right','repeat'],
+    map:["########","########","#####G##","####..##","###..###","##..####","#..#####","S.######"]},
+  { title:'ทำซ้ำจนกว่าจะถึง', dir:1, best:5, max:5,
+    text:'ขี้เกียจนับใช่ไหม? ใช้ "ทำซ้ำจนกว่าจะถึง 🚩" สติกแมนจะทำซ้ำไปเรื่อยๆ จนถึงธงเอง',
+    tools:['fwd','left','right','until'],
+    map:["S.######","#..#####","##..####","###..###","####..##","#####..#","######..","#######G"]},
+  { title:'ตัดสินใจ', dir:1, best:4, max:4,
+    text:'หินวางไม่เป็นระเบียบ ใช้ "ถ้ามี...ให้ทำ...ไม่อย่างนั้น" : ถ้ามีหินข้างหน้า → กระโดด ไม่อย่างนั้น → เดิน (ใช้ได้ 4 บล็อก)',
+    tools:['fwd','jump','until','ifelse'],
+    map:["##########","##########","##########","SX.X..X.XG","##########","##########","##########","##########","##########","##########"]},
+  { title:'ทางเลี้ยวซ้าย', dir:1, best:4, max:4,
+    text:'เดินไปเรื่อยๆ และ "ถ้ามีทางซ้าย" ก็ให้เลี้ยวซ้าย ใช้ได้แค่ 4 บล็อกเท่านั้น!',
+    tools:['fwd','left','right','until','if'],
+    map:["########","#.....##","#.###.##","#G###.##","#####.##","#S....##","########","########"]},
+  { title:'เขาวงกตสุดท้าย', dir:1, best:6, max:7,
+    text:'ด่านสุดท้าย! ถ้ามีทางข้างหน้า → เดิน ไม่อย่างนั้น → ถ้ามีทางซ้ายให้เลี้ยวซ้าย ไม่อย่างนั้นเลี้ยวขวา (ซ้อน "ถ้า" ไว้ใน "ถ้า")',
+    tools:['fwd','left','right','until','if','ifelse'],
+    map:["########","#S..####","###.####","###...##","#####.##","#G....##","########","########"]},
+];
+LEVELS.forEach(L=>{ L.map.forEach((row,y)=>{ const x=row.indexOf('S'); if(x>=0){L.sx=x;L.sy=y;} const g=row.indexOf('G'); if(g>=0){L.gx=g;L.gy=y;} }); L.w=L.map[0].length; L.h=L.map.length; });
+
+const DX=[0,1,0,-1], DY=[-1,0,1,0];
+
+// ---------------- Progress (localStorage, optional) ----------------
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem('smcq_'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem('smcq_'+k, JSON.stringify(v)); }catch(e){} }
+};
+let progress = store.get('progress', {}); // {levelIndex: stars}
+let levelIdx = Math.min(store.get('level',0), LEVELS.length-1);
+
+// ---------------- Blockly blocks ----------------
+const C_MOVE='#4c97ff', C_LOOP='#ffab19', C_LOGIC='#9966ff', C_START='#ef4444';
+Blockly.common.defineBlocksWithJsonArray([
+  {type:'stk_start', message0:'🏁 เมื่อเริ่มทำงาน', nextStatement:null, colour:C_START, tooltip:'โปรแกรมเริ่มที่นี่'},
+  {type:'stk_forward', message0:'🚶 เดินไปข้างหน้า', previousStatement:null, nextStatement:null, colour:C_MOVE, tooltip:'เดินไปข้างหน้า 1 ช่อง'},
+  {type:'stk_turn', message0:'เลี้ยว %1', args0:[{type:'field_dropdown',name:'DIR',options:[['ซ้าย ↺','LEFT'],['ขวา ↻','RIGHT']]}],
+    previousStatement:null, nextStatement:null, colour:C_MOVE, tooltip:'หันซ้ายหรือขวา 90 องศา'},
+  {type:'stk_jump', message0:'🤸 กระโดดข้าม', previousStatement:null, nextStatement:null, colour:'#0fbd8c', tooltip:'กระโดดไปข้างหน้า 2 ช่อง ข้ามก้อนหิน'},
+  {type:'stk_repeat', message0:'🔁 ทำซ้ำ %1 ครั้ง', args0:[{type:'field_number',name:'N',value:3,min:1,max:20,precision:1}],
+    message1:'%1', args1:[{type:'input_statement',name:'DO'}], previousStatement:null, nextStatement:null, colour:C_LOOP},
+  {type:'stk_until', message0:'🔁 ทำซ้ำจนกว่าจะถึง 🚩', message1:'%1', args1:[{type:'input_statement',name:'DO'}],
+    previousStatement:null, nextStatement:null, colour:C_LOOP},
+  {type:'stk_if', message0:'ถ้ามี %1', args0:[{type:'field_dropdown',name:'COND',options:[['ทางข้างหน้า','AHEAD'],['ทางซ้าย','LEFT'],['ทางขวา','RIGHT'],['หินข้างหน้า','ROCK']]}],
+    message1:'ให้ทำ %1', args1:[{type:'input_statement',name:'DO'}], previousStatement:null, nextStatement:null, colour:C_LOGIC},
+  {type:'stk_ifelse', message0:'ถ้ามี %1', args0:[{type:'field_dropdown',name:'COND',options:[['ทางข้างหน้า','AHEAD'],['ทางซ้าย','LEFT'],['ทางขวา','RIGHT'],['หินข้างหน้า','ROCK']]}],
+    message1:'ให้ทำ %1', args1:[{type:'input_statement',name:'DO'}],
+    message2:'ไม่อย่างนั้น %1', args2:[{type:'input_statement',name:'ELSE'}], previousStatement:null, nextStatement:null, colour:C_LOGIC},
+]);
+
+const TOOL_DEF = {
+  fwd:{kind:'block',type:'stk_forward'},
+  left:{kind:'block',type:'stk_turn',fields:{DIR:'LEFT'}},
+  right:{kind:'block',type:'stk_turn',fields:{DIR:'RIGHT'}},
+  jump:{kind:'block',type:'stk_jump'},
+  repeat:{kind:'block',type:'stk_repeat',fields:{N:3}},
+  until:{kind:'block',type:'stk_until'},
+  if:{kind:'block',type:'stk_if',fields:{COND:'LEFT'}},
+  ifelse:{kind:'block',type:'stk_ifelse',fields:{COND:'AHEAD'}},
+};
+
+let ws = null;
+function buildWorkspace(L){
+  if(ws){ ws.dispose(); }
+  ws = Blockly.inject('blockly', {
+    toolbox:{kind:'flyoutToolbox', contents:L.tools.map(t=>TOOL_DEF[t])},
+    renderer:'zelos', trashcan:true, sounds:false,
+    maxBlocks: L.max ? L.max+1 : Infinity,
+    zoom:{controls:true, wheel:false, startScale:0.85},
+    move:{scrollbars:true, drag:true, wheel:true},
+    grid:{spacing:24, length:2, colour:'#e5e7eb', snap:false},
+  });
+  const saved = store.get('ws_'+levelIdx, null);
+  let ok=false;
+  if(saved){ try{ Blockly.serialization.workspaces.load(saved, ws); ok = ws.getBlocksByType('stk_start').length===1; }catch(e){ ok=false; } }
+  if(!ok){ ws.clear(); addStart(); }
+  ws.getBlocksByType('stk_start').forEach(b=>b.setDeletable(false));
+  ws.addChangeListener(Blockly.Events.disableOrphans);
+  ws.addChangeListener(e=>{ if(e.isUiEvent) return; updateCount(); store.set('ws_'+levelIdx, Blockly.serialization.workspaces.save(ws)); });
+  updateCount();
+}
+function addStart(){
+  const b = ws.newBlock('stk_start'); b.initSvg(); b.render(); b.moveBy(30,30); b.setDeletable(false);
+}
+function blockCount(){ return ws.getAllBlocks(false).filter(b=>b.type!=='stk_start').length; }
+function updateCount(){
+  const L=LEVELS[levelIdx], n=blockCount(), el=document.getElementById('count');
+  el.innerHTML = L.max ? `บล็อก: <b class="${n>L.max?'over':''}">${n}</b> / ${L.max}` : `บล็อก: <b>${n}</b>`;
+}
+
+// ---------------- Simulation ----------------
+function tileAt(L,x,y){ if(x<0||y<0||x>=L.w||y>=L.h) return '#'; return L.map[y][x]; }
+const walk = t => t==='.'||t==='S'||t==='G';
+
+function simulate(L){
+  const st={x:L.sx,y:L.sy,dir:L.dir,done:false,result:null};
+  const acts=[]; const LIMIT=500;
+  const push=a=>{ acts.push(a); if(acts.length>LIMIT && !st.done){ st.done=true; st.result='limit'; } };
+  const cond=(c)=>{
+    const d = c==='LEFT'?(st.dir+3)%4 : c==='RIGHT'?(st.dir+1)%4 : st.dir;
+    const t = tileAt(L, st.x+DX[d], st.y+DY[d]);
+    return c==='ROCK' ? t==='X' : walk(t);
+  };
+  const atGoal=()=>st.x===L.gx&&st.y===L.gy;
+  function runChain(b){ while(b && !st.done){ if(b.isEnabled()) exec(b); b=b.getNextBlock(); } }
+  function exec(b){
+    switch(b.type){
+      case 'stk_forward': {
+        const nx=st.x+DX[st.dir], ny=st.y+DY[st.dir], t=tileAt(L,nx,ny);
+        if(t==='X'){ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why:'rock'}); st.done=true; st.result='rock'; return; }
+        if(!walk(t)){ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why:'wall'}); st.done=true; st.result='wall'; return; }
+        push({type:'move',id:b.id,fx:st.x,fy:st.y,x:nx,y:ny,dir:st.dir}); st.x=nx; st.y=ny;
+        if(atGoal()){ st.done=true; st.result='win'; }
+        return;
+      }
+      case 'stk_jump': {
+        const mx=st.x+DX[st.dir], my=st.y+DY[st.dir], lx=st.x+2*DX[st.dir], ly=st.y+2*DY[st.dir];
+        const mt=tileAt(L,mx,my), lt=tileAt(L,lx,ly);
+        if(mt==='#'){ push({type:'bump',id:b.id,x:st.x,y:st.y,dir:st.dir,why:'wall'}); st.done=true; st.result='wall'; return; }
+        if(!walk(lt)){ push({type:'jumpfail',id:b.id,fx:st.x,fy:st.y,dir:st.dir}); st.done=true; st.result='badjump'; return; }
+        push({type:'jump',id:b.id,fx:st.x,fy:st.y,x:lx,y:ly,dir:st.dir}); st.x=lx; st.y=ly;
+        if(atGoal()){ st.done=true; st.result='win'; }
+        return;
+      }
+      case 'stk_turn': {
+        const nd = b.getFieldValue('DIR')==='LEFT' ? (st.dir+3)%4 : (st.dir+1)%4;
+        push({type:'turn',id:b.id,x:st.x,y:st.y,from:st.dir,dir:nd,left:b.getFieldValue('DIR')==='LEFT'}); st.dir=nd; return;
+      }
+      case 'stk_repeat': {
+        const n=Math.max(0,Math.floor(+b.getFieldValue('N')||0));
+        for(let i=0;i<n && !st.done;i++) runChain(b.getInputTargetBlock('DO'));
+        return;
+      }
+      case 'stk_until': {
+        while(!st.done && !atGoal()){
+          const before=acts.length;
+          runChain(b.getInputTargetBlock('DO'));
+          if(!st.done && acts.length===before){ st.done=true; st.result='loop'; }
+        }
+        return;
+      }
+      case 'stk_if': if(cond(b.getFieldValue('COND'))) runChain(b.getInputTargetBlock('DO')); return;
+      case 'stk_ifelse': runChain(b.getInputTargetBlock(cond(b.getFieldValue('COND'))?'DO':'ELSE')); return;
+    }
+  }
+  const start = ws.getBlocksByType('stk_start')[0];
+  const first = start && start.getNextBlock();
+  if(!first) return {acts:[], result:'empty'};
+  runChain(first);
+  if(!st.result) st.result='notgoal';
+  return {acts, result:st.result};
+}
+
+const FAIL_MSG = {
+  wall:['ชนต้นไม้! 🌳','เดินต่อไม่ได้ ลองเช็คทิศทางที่สติกแมนหันอยู่ (ดูลูกศรใต้เท้า)'],
+  rock:['สะดุดหิน! 🪨','เดินชนก้อนหินล้มเลย ลองใช้บล็อก "กระโดดข้าม" แทน'],
+  badjump:['กระโดดพลาด!','ตรงที่กระโดดไปลงไม่มีทางเดิน'],
+  notgoal:['ยังไม่ถึงธง 🚩','โปรแกรมจบแล้วแต่สติกแมนยังไปไม่ถึง ลองเพิ่มบล็อกอีก'],
+  limit:['วนไม่รู้จบ! 🌀','โปรแกรมทำงานนานเกินไป ลองตรวจดูเงื่อนไขในบล็อกทำซ้ำ'],
+  loop:['วนไม่รู้จบ! 🌀','ในบล็อกทำซ้ำไม่มีคำสั่งไหนทำงานเลย สติกแมนเลยยืนเฉยๆ'],
+  empty:['ยังไม่มีโปรแกรม','ลากบล็อกมาต่อใต้ "เมื่อเริ่มทำงาน" ก่อนนะ'],
+};
+
+// ---------------- Rendering ----------------
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let DPR=1, CW=480;
+function sizeCanvas(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  cv.width = CW*DPR; cv.height = CW*DPR;
+}
+sizeCanvas();
+
+let actor = {x:0,y:0,dir:1,ang:90,z:0,phase:0,walking:false,pose:'idle',bx:0,by:0,rot:0};
+let queue=[], cur=null, curT=0, running=false, finalResult=null, confetti=[], bubble=null;
+
+function hash(x,y){ let h=x*374761393+y*668265263; h=(h^(h>>13))*1274126177; return ((h^(h>>16))>>>0)/4294967295; }
+
+function draw(t){
+  const L=LEVELS[levelIdx];
+  const ts = Math.floor(CW/Math.max(L.w,L.h));
+  const ox = (CW-ts*L.w)/2, oy=(CW-ts*L.h)/2;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle='#74bf63'; ctx.fillRect(0,0,CW,CW);
+  // grass tiles
+  for(let y=-1;y<=L.h;y++) for(let x=-1;x<=L.w;x++){
+    const px=ox+x*ts, py=oy+y*ts;
+    ctx.fillStyle = (x+y)%2? '#7cc36b':'#74bf63'; ctx.fillRect(px,py,ts,ts);
+  }
+  // paths
+  for(let y=0;y<L.h;y++) for(let x=0;x<L.w;x++){
+    const tile=L.map[y][x], px=ox+x*ts, py=oy+y*ts;
+    if(tile!=='#'){
+      ctx.fillStyle='#e9c98f'; roundRect(px+2,py+2,ts-4,ts-4,ts*0.18); ctx.fill();
+      ctx.fillStyle='#f3dcab'; roundRect(px+5,py+5,ts-10,ts-10,ts*0.14); ctx.fill();
+    }
+  }
+  // decorations
+  for(let y=-1;y<=L.h;y++) for(let x=-1;x<=L.w;x++){
+    const tile=tileAt(L,x,y), px=ox+x*ts, py=oy+y*ts, r=hash(x+levelIdx*7,y);
+    if(tile==='#'){
+      if(r<0.38) drawTree(px+ts/2, py+ts*0.62, ts, r);
+      else if(r<0.62) drawBush(px+ts*(0.3+r*0.5), py+ts*0.6, ts);
+      else if(r<0.75) drawFlower(px+ts*0.5, py+ts*0.5, ts, r);
+    }
+  }
+  for(let y=0;y<L.h;y++) for(let x=0;x<L.w;x++){
+    const tile=L.map[y][x], px=ox+x*ts, py=oy+y*ts;
+    if(tile==='X') drawRock(px+ts/2, py+ts*0.6, ts);
+    if(tile==='G') drawFlag(px+ts/2, py+ts*0.82, ts, t);
+  }
+  // arrow + actor
+  const ax=ox+(actor.x+0.5)*ts+actor.bx*ts, ay=oy+(actor.y+0.5)*ts+actor.by*ts;
+  ctx.save(); ctx.translate(ax, ay+ts*0.28); ctx.scale(1,0.55); ctx.rotate(actor.ang*Math.PI/180);
+  ctx.fillStyle='rgba(234,88,12,.85)'; ctx.beginPath(); ctx.moveTo(0,-ts*0.42); ctx.lineTo(ts*0.2,-ts*0.18); ctx.lineTo(-ts*0.2,-ts*0.18); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(ax, ay+ts*0.3, ts*0.2*(1-actor.z*0.4), ts*0.07, 0,0,Math.PI*2); ctx.fill();
+  drawStickman(ax, ay+ts*0.3 - actor.z*ts*0.7, ts*0.82, actor, t);
+  if(bubble){ drawBubble(ax, ay - ts*0.55 - actor.z*ts*0.7, bubble, ts); }
+  // confetti
+  confetti.forEach(p=>{ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=p.c; ctx.fillRect(-4,-2,8,4); ctx.restore(); });
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawTree(x,y,s,r){
+  ctx.fillStyle='rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x,y+s*0.1,s*0.28,s*0.08,0,0,7); ctx.fill();
+  ctx.fillStyle='#8b5a2b'; ctx.fillRect(x-s*0.05,y-s*0.15,s*0.1,s*0.25);
+  ctx.fillStyle=r<0.2?'#2f8f3a':'#3aa346';
+  ctx.beginPath(); ctx.arc(x,y-s*0.3,s*0.26,0,7); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.arc(x-s*0.08,y-s*0.38,s*0.09,0,7); ctx.fill();
+}
+function drawBush(x,y,s){ ctx.fillStyle='#4caf50'; [[-.1,0,.13],[.08,-.02,.12],[0,-.08,.12]].forEach(([dx,dy,rr])=>{ctx.beginPath();ctx.arc(x+dx*s,y+dy*s,rr*s,0,7);ctx.fill();}); }
+function drawFlower(x,y,s,r){ const c=['#fde047','#f472b6','#fff'][Math.floor(r*30)%3]; ctx.fillStyle=c; for(let i=0;i<5;i++){ const a=i*1.2566; ctx.beginPath(); ctx.arc(x+Math.cos(a)*s*0.05,y+Math.sin(a)*s*0.05,s*0.04,0,7); ctx.fill(); } ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(x,y,s*0.03,0,7); ctx.fill(); }
+function drawRock(x,y,s){
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x,y+s*0.12,s*0.3,s*0.08,0,0,7); ctx.fill();
+  ctx.fillStyle='#8a8f98'; ctx.beginPath(); ctx.moveTo(x-s*0.3,y+s*0.12); ctx.lineTo(x-s*0.24,y-s*0.1); ctx.lineTo(x-s*0.05,y-s*0.24); ctx.lineTo(x+s*0.2,y-s*0.16); ctx.lineTo(x+s*0.3,y+s*0.12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#b4b9c2'; ctx.beginPath(); ctx.moveTo(x-s*0.2,y-s*0.08); ctx.lineTo(x-s*0.05,y-s*0.2); ctx.lineTo(x+s*0.06,y-s*0.06); ctx.closePath(); ctx.fill();
+}
+function drawFlag(x,y,s,t){
+  ctx.strokeStyle='#5b3a1a'; ctx.lineWidth=s*0.05; ctx.beginPath(); ctx.moveTo(x-s*0.15,y); ctx.lineTo(x-s*0.15,y-s*0.7); ctx.stroke();
+  const w=Math.sin(t/220)*s*0.04;
+  ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(x-s*0.13,y-s*0.7); ctx.quadraticCurveTo(x+s*0.05,y-s*0.66+w,x+s*0.25,y-s*0.6); ctx.quadraticCurveTo(x+s*0.05,y-s*0.5-w,x-s*0.13,y-s*0.44); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.arc(x-s*0.15,y-s*0.72,s*0.04,0,7); ctx.fill();
+}
+function drawBubble(x,y,text,s){
+  ctx.font=`600 ${Math.max(12,s*0.26)}px Mitr, sans-serif`; const w=ctx.measureText(text).width+16, h=Math.max(22,s*0.4);
+  let bx=Math.min(Math.max(x-w/2,4),CW-w-4), by=Math.max(y-h,4);
+  ctx.fillStyle='#fff'; roundRect(bx,by,w,h,8); ctx.fill(); ctx.strokeStyle='#1f2937'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#1f2937'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text,bx+w/2,by+h/2+1);
+}
+
+// Stick man: (x,y) = feet, s = height
+function drawStickman(x,y,s,a,t){
+  const lw=Math.max(2.5,s*0.065), hr=s*0.13;
+  const dir=a.dir, side = dir===1?1: dir===3?-1:0;
+  const sw = a.walking ? Math.sin(a.phase) : 0;
+  const breathe = a.walking?0:Math.sin(t/500)*s*0.008;
+  const hipY=y-s*0.38, neckY=y-s*0.68+breathe, headY=neckY-hr*1.05;
+  ctx.save(); ctx.translate(x,y); ctx.rotate(a.rot); ctx.translate(-x,-y);
+  ctx.strokeStyle='#1f2937'; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.lineJoin='round';
+  // legs
+  const legSpread = side? s*0.16 : s*0.09;
+  const l1 = side? sw*legSpread : -legSpread*0.8 + sw*s*0.03;
+  const l2 = side? -sw*legSpread : legSpread*0.8 - sw*s*0.03;
+  const lift1 = (!side && a.walking) ? Math.max(0,sw)*s*0.06 : 0;
+  const lift2 = (!side && a.walking) ? Math.max(0,-sw)*s*0.06 : 0;
+  ctx.beginPath(); ctx.moveTo(x,hipY); ctx.lineTo(x+l1,y-lift1); ctx.moveTo(x,hipY); ctx.lineTo(x+l2,y-lift2); ctx.stroke();
+  // body
+  ctx.beginPath(); ctx.moveTo(x,hipY); ctx.lineTo(x,neckY); ctx.stroke();
+  // arms
+  const shY=neckY+s*0.06;
+  ctx.beginPath();
+  if(a.pose==='win'){
+    const wv=Math.sin(t/120)*s*0.04;
+    ctx.moveTo(x,shY); ctx.lineTo(x-s*0.2,shY-s*0.24+wv); ctx.moveTo(x,shY); ctx.lineTo(x+s*0.2,shY-s*0.24-wv);
+  } else if(a.pose==='fail'){
+    ctx.moveTo(x,shY); ctx.lineTo(x-s*0.24,shY+s*0.05); ctx.moveTo(x,shY); ctx.lineTo(x+s*0.24,shY+s*0.05);
+  } else if(a.pose==='jump'){
+    ctx.moveTo(x,shY); ctx.lineTo(x-s*0.18,shY-s*0.18); ctx.moveTo(x,shY); ctx.lineTo(x+s*0.18,shY-s*0.18);
+  } else if(side){
+    ctx.moveTo(x,shY); ctx.lineTo(x-sw*s*0.15,shY+s*0.24); ctx.moveTo(x,shY); ctx.lineTo(x+sw*s*0.15,shY+s*0.24);
+  } else {
+    ctx.moveTo(x,shY); ctx.lineTo(x-s*0.14,shY+s*0.22+sw*s*0.02); ctx.moveTo(x,shY); ctx.lineTo(x+s*0.14,shY+s*0.22-sw*s*0.02);
+  }
+  ctx.stroke();
+  // head
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,headY,hr,0,7); ctx.fill(); ctx.stroke();
+  // bandana
+  ctx.strokeStyle='#ef4444'; ctx.lineWidth=lw*0.9;
+  ctx.beginPath(); ctx.arc(x,headY,hr*0.92,Math.PI*1.12,Math.PI*1.88); ctx.stroke();
+  if(side){ const tx=x-side*hr*0.9; const fl=Math.sin(t/150)*hr*0.15; ctx.beginPath(); ctx.moveTo(tx,headY-hr*0.5); ctx.lineTo(tx-side*hr*0.7,headY-hr*0.2+fl); ctx.moveTo(tx,headY-hr*0.5); ctx.lineTo(tx-side*hr*0.6,headY+hr*0.1-fl); ctx.stroke(); }
+  // face
+  ctx.fillStyle='#1f2937'; ctx.strokeStyle='#1f2937'; ctx.lineWidth=Math.max(1.5,lw*0.5);
+  if(a.pose==='fail'){
+    const ex = side? [x+side*hr*0.4] : [x-hr*0.38,x+hr*0.38];
+    ex.forEach(e=>{ ctx.beginPath(); ctx.moveTo(e-hr*0.15,headY-hr*0.15); ctx.lineTo(e+hr*0.15,headY+hr*0.15); ctx.moveTo(e+hr*0.15,headY-hr*0.15); ctx.lineTo(e-hr*0.15,headY+hr*0.15); ctx.stroke(); });
+  } else if(dir===2 || a.pose==='win'){
+    ctx.beginPath(); ctx.arc(x-hr*0.38,headY-hr*0.05,hr*0.12,0,7); ctx.arc(x+hr*0.38,headY-hr*0.05,hr*0.12,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x,headY+hr*0.15,hr*0.38,0.2,Math.PI-0.2); ctx.stroke();
+  } else if(side){
+    ctx.beginPath(); ctx.arc(x+side*hr*0.45,headY-hr*0.05,hr*0.12,0,7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x+side*hr*0.2,headY+hr*0.42); ctx.lineTo(x+side*hr*0.6,headY+hr*0.35); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------------- Animation ----------------
+function speedMul(){ return [0,0.45,0.7,1,1.6,2.6][+document.getElementById('speed').value]; }
+function durOf(a){ const b=420/speedMul(); return {move:b, jump:b*1.4, turn:b*0.55, bump:b*1.1, jumpfail:b*1.4}[a.type]||b; }
+
+function resetActor(){
+  const L=LEVELS[levelIdx];
+  actor={x:L.sx,y:L.sy,dir:L.dir,ang:L.dir*90,z:0,phase:0,walking:false,pose:'idle',bx:0,by:0,rot:0};
+  queue=[]; cur=null; bubble=null; confetti=[];
+  if(ws) ws.highlightBlock(null);
+}
+function applyAct(a,p){
+  const e = p<0.5? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
+  switch(a.type){
+    case 'move': actor.x=a.fx+(a.x-a.fx)*p; actor.y=a.fy+(a.y-a.fy)*p; actor.walking=true; actor.phase=p*Math.PI*2; actor.dir=a.dir; break;
+    case 'jump': actor.x=a.fx+(a.x-a.fx)*e; actor.y=a.fy+(a.y-a.fy)*e; actor.z=Math.sin(p*Math.PI)*1.0; actor.pose='jump'; actor.walking=false; break;
+    case 'turn': { const delta = a.left?-90:90; actor.ang=a.from*90+delta*e; actor.dir = p<0.5?a.from:a.dir; actor.walking=false; break; }
+    case 'bump': { const k = p<0.4 ? p/0.4 : Math.max(0,1-(p-0.4)/0.3); actor.bx=DX[a.dir]*0.32*k; actor.by=DY[a.dir]*0.32*k; actor.walking=p<0.4; actor.phase=p*12;
+      if(p>0.4){ actor.pose='fail'; actor.rot=Math.min(1,(p-0.4)/0.4)*(a.dir===3?-1:1)*0.35; } break; }
+    case 'jumpfail': actor.bx=DX[a.dir]*1.2*e; actor.by=DY[a.dir]*1.2*e; actor.z=Math.sin(Math.min(p,0.8)/0.8*Math.PI)*0.9; actor.pose=p>0.8?'fail':'jump'; break;
+  }
+}
+function endAct(a){
+  actor.walking=false; actor.z=0; actor.phase=0;
+  if(a.type==='move'||a.type==='jump'){ actor.x=a.x; actor.y=a.y; actor.pose='idle'; }
+  if(a.type==='turn'){ actor.ang=a.dir*90; actor.dir=a.dir; }
+  if(a.type==='bump'||a.type==='jumpfail'){ actor.pose='fail'; bubble = a.why==='rock'?'โอ๊ย!':'อุ๊ย!'; }
+}
+
+let last=performance.now();
+function frame(t){
+  const dt=Math.min(50,t-last); last=t;
+  if(running){
+    if(!cur && queue.length){ cur=queue.shift(); curT=0; ws.highlightBlock(cur.id); }
+    if(cur){
+      curT+=dt; const d=durOf(cur), p=Math.min(1,curT/d);
+      applyAct(cur,p);
+      if(p>=1){ endAct(cur); cur=null; if(!queue.length) finishRun(); }
+    }
+  }
+  confetti.forEach(c=>{ c.x+=c.vx*dt/16; c.y+=c.vy*dt/16; c.vy+=0.12*dt/16; c.r+=c.vr; });
+  confetti = confetti.filter(c=>c.y<CW+20);
+  draw(t);
+  requestAnimationFrame(frame);
+}
+
+// ---------------- Run / UI ----------------
+const runBtn=document.getElementById('runBtn');
+function setRunBtn(isReset){ runBtn.textContent = isReset?'↺ รีเซ็ต':'▶ เริ่มทำงาน'; runBtn.classList.toggle('reset',isReset); }
+let hasRun=false;
+runBtn.onclick=()=>{
+  if(hasRun){ running=false; hasRun=false; resetActor(); setRunBtn(false); return; }
+  const L=LEVELS[levelIdx];
+  if(L.max && blockCount()>L.max){ showFail(['บล็อกเกินกำหนด',`ด่านนี้ใช้ได้ไม่เกิน ${L.max} บล็อก`]); return; }
+  resetActor();
+  const res=simulate(L);
+  finalResult=res.result;
+  hasRun=true; setRunBtn(true);
+  if(!res.acts.length){ finishRun(); return; }
+  queue=res.acts.slice(); running=true;
+};
+function finishRun(){
+  running=false; ws.highlightBlock(null);
+  const r=finalResult;
+  setTimeout(()=>{
+    if(r==='win'){ actor.pose='win'; bubble='เย้!'; burst(); setTimeout(showWin,900); }
+    else { if(r==='notgoal'||r==='loop'||r==='limit'){ bubble='หืม?'; } setTimeout(()=>showFail(FAIL_MSG[r]), 600); }
+  }, 120);
+}
+function burst(){ const cols=['#ef4444','#f59e0b','#22c55e','#3b82f6','#a855f7','#ec4899']; for(let i=0;i<120;i++) confetti.push({x:CW/2,y:CW/3,vx:(Math.random()-0.5)*12,vy:-Math.random()*9-2,r:Math.random()*6,vr:(Math.random()-0.5)*0.3,c:cols[i%cols.length]}); }
+
+const modal=document.getElementById('modal'), card=document.getElementById('card');
+function openModal(html){ card.innerHTML=html; modal.classList.add('show'); }
+function closeModal(){ modal.classList.remove('show'); }
+modal.addEventListener('click',e=>{ if(e.target===modal) closeModal(); });
+
+function showFail([title,msg]){
+  openModal(`<h3>${title}</h3><p>${msg}</p><div class="btns"><button class="big" id="mOk">ลองอีกครั้ง</button></div>`);
+  document.getElementById('mOk').onclick=()=>{ closeModal(); running=false; hasRun=false; resetActor(); setRunBtn(false); };
+}
+function showWin(){
+  const L=LEVELS[levelIdx], n=blockCount();
+  const stars = n<=L.best?3:(n<=L.best+2?2:1);
+  progress[levelIdx]=Math.max(progress[levelIdx]||0,stars); store.set('progress',progress); renderLevels();
+  const lastLv = levelIdx===LEVELS.length-1;
+  const tip = n<=L.best ? `เยี่ยมมาก! ใช้ ${n} บล็อก เท่ากับวิธีที่สั้นที่สุด` : `ใช้ไป ${n} บล็อก — วิธีที่สั้นที่สุดใช้แค่ ${L.best} บล็อก ลองท้าทายดูไหม?`;
+  openModal(`<h3>${lastLv?'🏆 จบเกมแล้ว!':'🎉 ผ่านด่าน '+(levelIdx+1)+'!'}</h3>
+    <div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
+    <p>${lastLv?'สุดยอด! คุณเขียนโปรแกรมพาสติกแมนผ่านทุกด่านแล้ว<br>':''}${tip}</p>
+    <pre class="code">${escapeHtml(genCode())}</pre>
+    <div class="btns"><button class="ghost" id="mAgain">เล่นด่านนี้อีกครั้ง</button>${lastLv?'':'<button class="big" id="mNext">ด่านต่อไป ➜</button>'}</div>`);
+  document.getElementById('mAgain').onclick=()=>{ closeModal(); hasRun=false; resetActor(); setRunBtn(false); };
+  const nb=document.getElementById('mNext'); if(nb) nb.onclick=()=>{ closeModal(); loadLevel(levelIdx+1); };
+}
+function escapeHtml(s){ return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function genCode(){
+  const C={AHEAD:'isPathAhead()',LEFT:'isPathLeft()',RIGHT:'isPathRight()',ROCK:'isRockAhead()'};
+  let out='';
+  const chain=(b,ind)=>{ while(b){ one(b,ind); b=b.getNextBlock(); } };
+  const one=(b,ind)=>{
+    const p='  '.repeat(ind);
+    switch(b.type){
+      case 'stk_forward': out+=p+'moveForward();\n'; break;
+      case 'stk_jump': out+=p+'jump();\n'; break;
+      case 'stk_turn': out+=p+(b.getFieldValue('DIR')==='LEFT'?'turnLeft();':'turnRight();')+'\n'; break;
+      case 'stk_repeat': out+=p+`for (let i = 0; i < ${b.getFieldValue('N')}; i++) {\n`; chain(b.getInputTargetBlock('DO'),ind+1); out+=p+'}\n'; break;
+      case 'stk_until': out+=p+'while (notAtFlag()) {\n'; chain(b.getInputTargetBlock('DO'),ind+1); out+=p+'}\n'; break;
+      case 'stk_if': out+=p+`if (${C[b.getFieldValue('COND')]}) {\n`; chain(b.getInputTargetBlock('DO'),ind+1); out+=p+'}\n'; break;
+      case 'stk_ifelse': out+=p+`if (${C[b.getFieldValue('COND')]}) {\n`; chain(b.getInputTargetBlock('DO'),ind+1); out+=p+'} else {\n'; chain(b.getInputTargetBlock('ELSE'),ind+1); out+=p+'}\n'; break;
+    }
+  };
+  const s=ws.getBlocksByType('stk_start')[0];
+  chain(s&&s.getNextBlock(),0);
+  return out || '// ยังไม่มีโค้ด';
+}
+document.getElementById('codeBtn').onclick=()=>{
+  openModal(`<h3>{ } โค้ดของคุณ</h3><p>บล็อกที่ต่อไว้ เขียนเป็นภาษา JavaScript ได้แบบนี้</p><pre class="code">${escapeHtml(genCode())}</pre><div class="btns"><button class="big" id="mOk">ปิด</button></div>`);
+  document.getElementById('mOk').onclick=closeModal;
+};
+document.getElementById('clearBtn').onclick=()=>{
+  if(!confirm('ลบบล็อกทั้งหมดในด่านนี้?')) return;
+  ws.clear(); addStart(); updateCount();
+  running=false; hasRun=false; resetActor(); setRunBtn(false);
+};
+
+function renderLevels(){
+  const el=document.getElementById('levels'); el.innerHTML='';
+  LEVELS.forEach((L,i)=>{
+    const b=document.createElement('button');
+    b.className='lv'+(progress[i]?' done':'')+(i===levelIdx?' cur':'');
+    b.title=`ด่าน ${i+1}: ${L.title}`;
+    b.innerHTML = (i+1) + (progress[i]?`<span class="st">${'★'.repeat(progress[i])}</span>`:'');
+    b.onclick=()=>loadLevel(i);
+    el.appendChild(b);
+  });
+}
+function loadLevel(i){
+  levelIdx=i; store.set('level',i);
+  const L=LEVELS[i];
+  document.getElementById('ltitle').textContent=`ด่าน ${i+1}/${LEVELS.length}: ${L.title}`;
+  document.getElementById('ltext').textContent=L.text;
+  running=false; hasRun=false; setRunBtn(false);
+  buildWorkspace(L); resetActor(); renderLevels();
+}
+window.addEventListener('resize',()=>{ sizeCanvas(); if(ws) Blockly.svgResize(ws); });
+
+loadLevel(levelIdx);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
